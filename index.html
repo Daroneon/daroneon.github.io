@@ -49,9 +49,7 @@ var div = document.createElement('div');
 div.textContent = 'This is Shadow DOM';
 root.appendChild(div); // Append elements to the Shadow Root
   </script>
-    <div id="host">
-    <button type="button">Shady af button</button>
-  </div>
+  
   
  <script>
 customElements.define('show-hello', class extends HTMLElement {
@@ -64,7 +62,7 @@ customElements.define('show-hello', class extends HTMLElement {
 });
 </script>
   
-  <show-hello name="Button"></show-hello>
+  
   <button type="button" id="shadow button">Shadow Button</button>
   
 
