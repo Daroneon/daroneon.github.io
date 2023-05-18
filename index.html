@@ -40,9 +40,7 @@ glia.addEventListener(glia.EVENTS.QUEUE_STATE_UPDATE, onQueueStateUpdate);
   <button type="button" id="test-button">Click Me</button>
   <p><a href="index2.html">Second Page</a></p>
   <p><a href="index3.html">Third Page</a></p>
-  <div id="host">
-    <button type="button">Shady af button</button>
-  </div>
+
 
   <script>
 var host = document.querySelector('#host');
@@ -51,6 +49,9 @@ var div = document.createElement('div');
 div.textContent = 'This is Shadow DOM';
 root.appendChild(div); // Append elements to the Shadow Root
   </script>
+    <div id="host">
+    <button type="button">Shady af button</button>
+  </div>
   
 
 
