@@ -53,13 +53,13 @@ root.appendChild(div); // Append elements to the Shadow Root
     <button type="button">Shady af button</button>
   </div>
   
-  <script>
+ <script>
 customElements.define('show-hello', class extends HTMLElement {
   connectedCallback() {
     const shadow = this.attachShadow({mode: 'open'});
     shadow.innerHTML = `<p>
-      Test ${this.getAttribute('name')}
-    </p>;
+      Hello, ${this.getAttribute('name')}
+    </p>`;
   }
 });
 </script>
