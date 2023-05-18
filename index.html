@@ -59,8 +59,8 @@ customElements.define('show-hello', class extends HTMLElement {
     const shadow = this.attachShadow({mode: 'open'});
     shadow.innerHTML = `<p>
       Test ${this.getAttribute('name')}
-      <button type="button" id="shadow-button>Shady Button</button>
     </p>`;
+      <button type="button" id="shadow-button>Shady Button</button>
   }
 });
 </script>
