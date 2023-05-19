@@ -51,19 +51,16 @@ root.appendChild(div); // Append elements to the Shadow Root
   </script>
   
   
- <script>
-customElements.define('show-hello', class extends HTMLElement {
-  connectedCallback() {
-    const shadow = this.attachShadow({mode: 'open'});
-    shadow.innerHTML = `<p>
-      Hello, ${this.getAttribute('name')}
-    </p>`;
-  }
-});
+<script>
+  elem.attachShadow({mode: 'open'});
+  elem.shadowRoot.innerHTML = `
+    <style> p { font-weight: bold; } </style>
+    <button type="button" id="shadow-button">Shadow Button</button>
+  `;
+
+  alert(document.querySelectorAll('p').length); // 0
+  alert(elem.shadowRoot.querySelectorAll('p').length); // 1
 </script>
-  
-  
-  <button type="button" id="shadow-button">Shadow Button</button>
   
 
 
