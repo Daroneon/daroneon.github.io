@@ -47,9 +47,13 @@ const shadowRoot = header.attachShadow({mode: 'open'});
   shadowRoot.innerHTML = '<button type="button" id="shadow-button">Shadow Button</button>';
   const shadowOpen = <div>.attachShadow({ mode: "open" });
   </script>
-  
-  #shadow-root (open)
+  <script>
+    const targetElement = document.getElementById('shadow-div');
+    const shadowRoot = targetElement.attachShadow({ mode: 'open' });
+    
+ <div id="shadow-div">
   <button type="button" id="shadow-button">Shadow Buitton</button>
+  </div>
   
   <script>
 customElements.define('show-hello', class extends HTMLElement {
