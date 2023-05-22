@@ -51,6 +51,19 @@ const shadowRoot = header.attachShadow({mode: 'open'});
   #shadow-root (open)
   <button type="button" id="shadow-button">Shadow Buitton</button>
   
+  <script>
+customElements.define('show-hello', class extends HTMLElement {
+  connectedCallback() {
+    const shadow = this.attachShadow({mode: 'open'});
+    shadow.innerHTML = `<p>
+      Hello, ${this.getAttribute('name')}
+    </p>`;
+  }
+});
+</script>
+
+<show-hello name="John"></show-hello>
+  
  
   
   
