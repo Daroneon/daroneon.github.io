@@ -50,6 +50,9 @@ const shadowRoot = header.attachShadow({mode: 'open'});
   <script>
     const targetElement = document.getElementById('shadow-div');
     const shadowRoot = targetElement.attachShadow({ mode: 'open' });
+    const paragraph = document.createElement('p');
+paragraph.textContent = 'This is a paragraph inside the Shadow DOM';
+shadowRoot.appendChild(paragraph);
     
  <div id="shadow-div">
   <button type="button" id="shadow-button">Shadow Buitton</button>
