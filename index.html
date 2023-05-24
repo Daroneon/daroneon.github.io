@@ -40,37 +40,7 @@ glia.addEventListener(glia.EVENTS.QUEUE_STATE_UPDATE, onQueueStateUpdate);
   <button type="button" id="test-button">Click Me</button>
   <p><a href="index2.html">Second Page</a></p>
   <p><a href="index3.html">Third Page</a></p>
-<script>
-  const shadow = this.attachShadow({ mode: "open" });
-const header = document.createElement('header');
-const shadowRoot = header.attachShadow({mode: 'open'});
-  shadowRoot.innerHTML = '<button type="button" id="shadow-button">Shadow Button</button>';
-  const shadowOpen = <div>.attachShadow({ mode: "open" });
-  </script>
-  <script>
-    const targetElement = document.getElementById('shadow-button');
-    const shadowRoot = targetElement.attachShadow({ mode: 'open' });
-   const button = document.createElement('button');
-button.textContent = 'Click Me';
-shadowRoot.appendChild(button);
-  </script>
-    
- <div id="shadow-div">
-  <button type="button" id="shadow-button">Shadow Buitton</button>
-  </div>
-  
-  <script>
-customElements.define('show-hello', class extends HTMLElement {
-  connectedCallback() {
-    const shadow = this.attachShadow({mode: 'open'});
-    shadow.innerHTML = `<p>
-      Hello, ${this.getAttribute('name')}
-    </p>`;
-  }
-});
-</script>
 
-<show-hello name="John"></show-hello>
   
  
   
