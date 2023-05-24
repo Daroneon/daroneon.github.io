@@ -49,6 +49,14 @@ buttonEl.id = 'this-is-button-id';
 shadowRoot.appendChild(buttonEl);
   </script>
   
+  <script>
+    const header = document.createElement('header');
+const h1 = document.createElement('h1');
+h1.textContent = 'Hello DOM';
+header.appendChild(h1);
+document.body.appendChild(header);
+  </script>
+  
   <h1>Test</h1>
   
   <div class="shadow-div">
