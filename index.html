@@ -50,11 +50,8 @@ shadowRoot.appendChild(buttonEl);
   </script>
   
   <script>
-    const header = document.createElement('header');
-const h1 = document.createElement('h1');
-h1.textContent = 'Hello DOM';
-header.appendChild(h1);
-document.body.appendChild(header);
+  const header = document.createElement('header');
+const shadowRoot = header.attachShadow({mode: 'open'});
   </script>
   
   <h1>Test</h1>
