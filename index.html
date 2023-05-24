@@ -41,13 +41,15 @@ glia.addEventListener(glia.EVENTS.QUEUE_STATE_UPDATE, onQueueStateUpdate);
   <p><a href="index2.html">Second Page</a></p>
   <p><a href="index3.html">Third Page</a></p>
   <script>
-  const shadowHost = document.querySelector('.container'); // siia panna olemasoleva elemendi selector, mis on hetkel lehel. see element asendatakse shadow domiga
+  const shadowHost = document.querySelector('.div'); // siia panna olemasoleva elemendi selector, mis on hetkel lehel. see element asendatakse shadow domiga
 const shadowRoot = shadowHost.attachShadow({mode: 'open'});
 const buttonEl = document.createElement('button');
 buttonEl.textContent = 'Click me';
 buttonEl.id = 'this-is-button-id';
 shadowRoot.appendChild(buttonEl);
   </script>
+  
+  
   
   
   
