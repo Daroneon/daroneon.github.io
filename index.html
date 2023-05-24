@@ -52,6 +52,7 @@ shadowRoot.appendChild(buttonEl);
   <script>
   const header = document.createElement('header');
 const shadowRoot = header.attachShadow({mode: 'open'});
+    shadowRoot.innerHTML = '<h1>Hello Shadow DOM</h1>';
   </script>
   
   <h1>Test</h1>
