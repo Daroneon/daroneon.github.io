@@ -50,6 +50,45 @@ shadowRoot.appendChild(buttonEl);
   </script>
   
  <a onclick="document.body.appendChild(document.createElement('sm-visitor-code'))" "="">Get Co-Browsing Code</a>
+  <script>const $onInit = () => {
+
+if ($ctrl.gliaIdentifierEnabled) {
+
+userDetailsModel
+
+.load()
+
+.then(details => {
+
+// eslint-disable-next-line no-undef
+
+if (sm && details) {
+
+// eslint-disable-next-line no-undef
+
+sm.getApi({ version: 'v1' }).then(glia => {
+
+glia.updateInformation({
+
+customAttributesUpdateMethod: 'merge',
+
+customAttributes: {
+
+externalId: details.externalUser,
+
+},
+
+});
+
+});
+
+}
+
+});
+
+}
+
+};</script>
                                                                                        
   
 
