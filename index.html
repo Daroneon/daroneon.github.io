@@ -3,37 +3,9 @@
 <html>
   <head>
     <link rel="stylesheet" href="style.css">
- <script async src="https://api.glia.com/salemove_integration.js">
-    const installGlia = function(callback) {
-  const gliaIntegrationScriptUrl = 'https://api.salemove.com/salemove_integration.js';
-  var scriptElement = document.createElement('script');
-
-  scriptElement.async = 1;
-  scriptElement.src = gliaIntegrationScriptUrl;
-  scriptElement.type = 'text/javascript';
-  if (typeof(callback) === 'function') {
-    scriptElement.addEventListener('load', callback);
-  }
-  
-  document.body.append(scriptElement);
-};
-
-installGlia(function(){
-  sm.getApi({version: 'v1'}).then(function(glia) {
-function onQueueStateUpdate(queueState) {
-const element = document.querySelector('[data-sm-show-media-selection-on]');
-if (queueState.state !== queueState.QUEUE_STATES.CAN_QUEUE) {
-element.style.display = 'none';
-} else {
-element.style.display = 'inline';
-}
-}
-glia.addEventListener(glia.EVENTS.QUEUE_STATE_UPDATE, onQueueStateUpdate);
-});
-
-    </script>
+ <script async src="https://api.glia.com/salemove_integration.js"></script>
    
-  </head>
+</head>
 <body>
 
 <h1>My First Heading</h1>
@@ -48,7 +20,7 @@ const buttonEl = document.createElement('button');
 buttonEl.textContent = 'Shadow Button';
 buttonEl.id = 'shadow-button';
 shadowRoot.appendChild(buttonEl);
-<script/>
+</script>
 
 
                                                                                        
