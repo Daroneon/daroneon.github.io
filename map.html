@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Empires Through Time — Interactive Historical Map</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <style>
+    :root {
+      --panel-bg: rgba(20, 24, 34, 0.92);
+      --accent: #ffce54;
+      --text: #f3f3f3;
+    }
+    html, body { margin: 0; height: 100%; font-family: Arial, Helvetica, sans-serif; }
+    #map { position: absolute; inset: 0; background: #aadaff; }
+
+    /* Title badge */
+    #title {
+      position: absolute; top: 14px; left: 14px; z-index: 1000;
+      background: var(--panel-bg); color: var(--text);
+      padding: 10px 14px; border-radius: 10px; max-width: 280px;
+      box-shadow: 0 4px 18px rgba(0,0,0,.35);
+    }
+    #title h1 { margin: 0 0 4px; font-size: 16px; }
+    #title p { margin: 0; font-size: 11px; opacity: .8; line-height: 1.4; }
+    #title a { color: var(--accent); }
+
+    /* Year control */
+    #control {
+      position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+      z-index: 1000; width: min(720px, 92vw);
+      background: var(--panel-bg); color: var(--text);
+      padding: 14px 18px 16px; border-radius: 12px;
+      box-shadow: 0 6px 22px rgba(0,0,0,.4);
+    }
+    #yearRow { display: flex; align-items: center; gap: 14px; }
+    #playBtn {
+      flex: none; width: 42px; height: 42px; border-radius: 50%;
+      border: none; cursor: pointer; font-size: 18px;
+      background: var(--accent); color: #1a1a1a; font-weight: bold;
+    }
+    #playBtn:hover { filter: brightness(1.08); }
+    #yearLabel { flex: none; min-width: 92px; text-align: center; }
+    #yearLabel .num { font-size: 26px; font-weight: bold; color: var(--accent); }
+    #yearLabel .era { font-size: 11px; opacity: .75; }
+    #slider { flex: 1; cursor: pointer; accent-color: var(--accent); }
+    #ticks { display: flex; justify-content: space-between;
+             font-size: 10px; opacity: .6; margin: 6px 4px 0 150px; }
+
+    /* Loading + status */
+    #status {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 1000; background: var(--panel-bg); color: var(--text);
+      padding: 6px 14px; border-radius: 20px; font-size: 12px;
+      transition: opacity .3s; pointer-events: none;
+    }
+    #status.hidden { opacity: 0; }
+
+    /* Historical facts panel */
+    #facts {
+      position: absolute; top: 14px; right: 14px; z-index: 1000;
+      background: var(--panel-bg); color: var(--text);
+      padding: 12px 16px; border-radius: 10px; max-width: 300px;
+      box-shadow: 0 4px 18px rgba(0,0,0,.35);
+      transition: opacity .35s ease; opacity: 1;
+    }
+    #facts.swap { opacity: 0; }
+    #facts .era-label { font-size: 11px; letter-spacing: .08em;
+      text-transform: uppercase; opacity: .6; }
+    #facts h2 { margin: 2px 0 6px; font-size: 15px; color: var(--accent); }
+    #facts p { margin: 0; font-size: 12.5px; line-height: 1.55; }
+    @media (max-width: 640px) {
+      #facts { max-width: 200px; top: auto; bottom: 120px; font-size: 11px; }
+    }
+
+    .leaflet-tooltip.territory-tip {
+      font-weight: bold; font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="title">
+    <h1>Empires Through Time</h1>
+    <p>Drag the slider or press play to watch borders shift across history.
+       Colors group territories by their ruling power. Data:
+       <a href="https://github.com/aourednik/historical-basemaps" target="_blank" rel="noopener">Historical Basemaps</a> (CC&nbsp;BY-SA&nbsp;4.0).</p>
+  </div>
+
+  <div id="status">Loading…</div>
+
+  <div id="facts">
+    <div class="era-label">—</div>
+    <h2>—</h2>
+    <p>—</p>
+  </div>
+
+  <div id="control">
+    <div id="yearRow">
+      <button id="playBtn" title="Play / pause">▶</button>
+      <div id="yearLabel"><span class="num">—</span><br><span class="era"></span></div>
+      <input id="slider" type="range" min="0" max="0" step="1" value="0">
+    </div>
+    <div id="ticks"></div>
+  </div>
+
+  <script>
+  // --- Available snapshot years from the Historical Basemaps dataset ---
+  // value = numeric year (negative = BC), file = geojson filename
+  const YEARS = [
+    -123000,-10000,-8000,-5000,-4000,-3000,-2000,-1500,-1000,-700,-500,-400,
+    -323,-300,-200,-100,-1,100,200,300,400,500,600,700,800,900,1000,1100,1200,
+    1279,1300,1400,1492,1500,1530,1600,1650,1700,1715,1783,1800,1815,1880,1900,
+    1914,1920,1930,1938,1945,1960,1994,2000,2010
+  ].map(y => ({
+    value: y,
+    file: y < 0 ? `world_bc${Math.abs(y)}.geojson` : `world_${y}.geojson`
+  }));
+
+  const BASE = "https://cdn.jsdelivr.net/gh/aourednik/historical-basemaps@master/geojson/";
+
+  // --- Curated historical context, keyed by snapshot year ---
+  const FACTS = {
+    [-123000]: ["Paleolithic", "Anatomically modern humans live as hunter-gatherers, mostly in Africa. No states, cities, or fixed borders exist yet."],
+    [-10000]:  ["Neolithic Revolution", "As the last Ice Age ends, farming begins in the Fertile Crescent — the first step toward villages and, eventually, states."],
+    [-8000]:   ["Early Agriculture", "Farming villages such as Jericho and Çatalhöyük take shape as agriculture spreads across the Near East."],
+    [-5000]:   ["First Complex Societies", "Irrigation-based cultures arise in Mesopotamia (Ubaid) and along the Nile in predynastic Egypt."],
+    [-4000]:   ["Dawn of Cities", "Sumerian city-states emerge in Mesopotamia at the start of the Bronze Age."],
+    [-3000]:   ["Writing & Pharaohs", "Egypt is unified (~3100 BC) under its first dynasties, and Sumer develops cuneiform — the earliest writing."],
+    [-2000]:   ["Bronze Age Civilizations", "Middle Kingdom Egypt, Minoan Crete, the Indus Valley cities, and Babylon flourish."],
+    [-1500]:   ["Age of Empires Begins", "New Kingdom Egypt, the Hittites, Mycenaean Greece, and Shang China dominate their regions."],
+    [-1000]:   ["After the Collapse", "Following the Bronze Age Collapse, Neo-Assyria rises, Zhou rules China, and Phoenician traders spread across the Mediterranean."],
+    [-700]:    ["Assyrian Power", "The Neo-Assyrian Empire dominates the Near East; Greek city-states flourish and Rome is traditionally founded (753 BC)."],
+    [-500]:    ["Persian Zenith", "The Achaemenid Persian Empire under Darius I is the largest the world has yet seen. The Roman Republic is founded (509 BC)."],
+    [-400]:    ["Classical Greece", "Greek city-states thrive after the Peloponnesian War; Persia looms to the east and China enters its Warring States era."],
+    [-323]:    ["Alexander's Empire", "Alexander the Great dies, leaving an empire stretching from Greece to India — about to shatter among his generals."],
+    [-300]:    ["Hellenistic World", "Alexander's successors rule vast kingdoms (Seleucid, Ptolemaic); the Maurya Empire unites India and Rome expands in Italy."],
+    [-200]:    ["Rome vs Carthage", "Rome defeats Carthage in the Punic Wars and dominates the Mediterranean; Han China is firmly established."],
+    [-100]:    ["Late Republic", "The Roman Republic rules the Mediterranean, Parthia holds Persia, and Han China prospers along the Silk Road."],
+    [-1]:      ["Augustan Rome", "Augustus has transformed Rome into an empire (27 BC). Rome and Han China — at opposite ends of Eurasia — are the great powers."],
+    [100]:     ["Pax Romana", "The Roman Empire nears its peak alongside Han China, the Kushans in India, and Parthia."],
+    [200]:     ["Edge of Crisis", "Rome enters a turbulent century; Han China is collapsing (220 AD), soon followed by an age of division."],
+    [300]:     ["Reordering Powers", "Sassanid Persia rivals Rome, China is fragmented, and Constantine is about to reshape the Roman world."],
+    [400]:     ["Rome Fractures", "The Western Roman Empire weakens under migrations, while India enjoys the Gupta golden age."],
+    [500]:     ["Fall of the West", "The Western Roman Empire has fallen (476). The Byzantine East endures and Frankish kingdoms rise in Europe."],
+    [600]:     ["Eve of Islam", "Byzantium and Sassanid Persia exhaust each other in war, just before the rise of Islam transforms the map."],
+    [700]:     ["Islamic Expansion", "The Umayyad Caliphate stretches from Spain to Central Asia; Tang China is at its cultural height."],
+    [800]:     ["Charlemagne & the Abbasids", "Charlemagne is crowned Emperor (800) as the Abbasid Caliphate enters its golden age in Baghdad."],
+    [900]:     ["Age of Fragmentation", "The Carolingian and Abbasid realms break apart; Vikings raid Europe and Tang China collapses."],
+    [1000]:    ["Medieval Powers", "The Holy Roman Empire, a revived Byzantium, Song China, and the Fatimids define a connected medieval world."],
+    [1100]:    ["The Crusades", "European crusaders march east (from 1096) into a Near East dominated by the Seljuk Turks; Song China thrives."],
+    [1200]:    ["Before the Storm", "On the eve of Mongol expansion, Song China, the Almohads, and the Khmer Empire are at their height."],
+    [1279]:    ["Mongol Empire", "The Mongol Empire reaches its greatest extent — the largest contiguous land empire in history — as Kublai Khan conquers Song China."],
+    [1300]:    ["Mongol Successors", "The Mongol realm splits into khanates; the Ottoman Turks emerge and the Mamluks hold Egypt."],
+    [1400]:    ["Ming & Ottomans", "Ming China and the rising Ottoman Empire dominate; Timur's conquests reshape Central Asia."],
+    [1492]:    ["A New World", "Columbus reaches the Americas and Granada falls, completing the Reconquista — a turning point for global history."],
+    [1500]:    ["Age of Exploration", "European voyages link the continents; the Aztec and Inca empires flourish, unaware of what is coming."],
+    [1530]:    ["Conquest & Gunpowder", "Spain topples the Aztec and Inca empires; the Ottomans peak under Suleiman and the Mughals take India."],
+    [1600]:    ["Gunpowder Empires", "The Ottoman, Safavid, and Mughal empires span the Islamic world as Europe's trading companies reach Asia."],
+    [1650]:    ["Westphalia & Qing", "The Peace of Westphalia (1648) reshapes Europe's states while the Qing conquer China."],
+    [1700]:    ["Imperial Apex", "The Mughals under Aurangzeb, Qing China, and an expanding Russia under Peter the Great dominate Eurasia."],
+    [1715]:    ["Rival Crowns", "Louis XIV dies; Britain and France begin a global contest for colonies and trade."],
+    [1783]:    ["American Independence", "The United States wins independence, shifting Britain's imperial focus — and the French Revolution looms."],
+    [1800]:    ["Napoleonic Era", "Revolution and Napoleon convulse Europe; Britain industrializes while Qing China remains the world's largest economy."],
+    [1815]:    ["Concert of Europe", "After Napoleon's defeat, the Congress of Vienna redraws Europe and ushers in a century of relative great-power peace."],
+    [1880]:    ["Scramble for Africa", "Industrial Europe carves up Africa and Asia at the height of the age of empire."],
+    [1900]:    ["Peak of Empire", "European colonial empires — above all Britain's — span the globe on the eve of a century of upheaval."],
+    [1914]:    ["World War I", "The great empires of Europe go to war, ending a century of relative peace and setting old dynasties on the path to collapse."],
+    [1920]:    ["Empires Fall", "WWI shatters the German, Austro-Hungarian, Russian, and Ottoman empires; new nations appear across Europe and the Middle East."],
+    [1930]:    ["Interwar Years", "The Great Depression grips the world; the USSR consolidates and fascism rises as colonial empires remain intact."],
+    [1938]:    ["Eve of War", "Nazi Germany expands through annexation and appeasement while Imperial Japan wages war in China."],
+    [1945]:    ["End of WWII", "The Axis is defeated; the US and USSR emerge as superpowers and the long retreat of colonial empires begins."],
+    [1960]:    ["Year of Africa", "Seventeen African nations gain independence in a single year as decolonization sweeps the globe amid the Cold War."],
+    [1994]:    ["After the Cold War", "The Soviet Union has dissolved (1991), Germany is reunified, and apartheid ends in South Africa."],
+    [2000]:    ["A Globalized World", "In the post-Cold War 'unipolar moment,' the EU expands and globalization links national economies as never before."],
+    [2010]:    ["The Present", "Today's borders take shape amid a rising China, a deepening EU, and a multipolar world."]
+  };
+
+  // --- Map setup ---
+  const map = L.map("map", { worldCopyJump: true, minZoom: 1 }).setView([25, 15], 2);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+    attribution: '© OpenStreetMap, © CARTO', subdomains: "abcd", maxZoom: 10
+  }).addTo(map);
+
+  let currentLayer = null;
+  let currentPane = null;
+  let paneCounter = 0;
+  const cache = {};            // file -> geojson
+  const statusEl = document.getElementById("status");
+  const factsEl = document.getElementById("facts");
+
+  // Deterministic color from a string (so each power keeps its color across years)
+  function colorFor(name) {
+    if (!name) return "#cccccc";
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    const hue = h % 360;
+    const sat = 55 + (h % 25);
+    const lig = 55 + ((h >> 3) % 18);
+    return `hsl(${hue} ${sat}% ${lig}%)`;
+  }
+
+  function styleFor(feature) {
+    const key = feature.properties.SUBJECTO || feature.properties.NAME;
+    return { fillColor: colorFor(key), fillOpacity: 0.7, color: "#3a3a3a", weight: 0.7 };
+  }
+
+  function onEachFeature(feature, layer) {
+    const p = feature.properties;
+    const name = p.NAME || "Unknown";
+    const sub  = p.SUBJECTO && p.SUBJECTO !== p.NAME ? ` (under ${p.SUBJECTO})` : "";
+    layer.bindTooltip(name + sub, { className: "territory-tip", sticky: true });
+    layer.on({
+      mouseover: e => e.target.setStyle({ weight: 2, color: "#000", fillOpacity: 0.9 }),
+      mouseout:  e => e.target.setStyle(styleFor(e.target.feature))
+    });
+  }
+
+  function setStatus(msg) {
+    if (msg) { statusEl.textContent = msg; statusEl.classList.remove("hidden"); }
+    else { statusEl.classList.add("hidden"); }
+  }
+
+  async function loadYear(idx) {
+    const { file, value } = YEARS[idx];
+    updateLabel(value);
+    showFact(value);
+    if (!cache[file]) {
+      setStatus(`Loading ${formatYear(value)}…`);
+      try {
+        const res = await fetch(BASE + file);
+        if (!res.ok) throw new Error(res.status);
+        cache[file] = await res.json();
+      } catch (err) {
+        setStatus(`No data for ${formatYear(value)}`);
+        return;
+      }
+    }
+    // Guard against rapid slider moves landing on a different year
+    if (parseInt(slider.value, 10) !== idx) return;
+    setStatus(null);
+
+    // Crossfade: new layer fades in on its own pane while the old fades out.
+    const paneName = "fade-" + (paneCounter++);
+    const pane = map.createPane(paneName);
+    pane.style.transition = "opacity .6s ease";
+    pane.style.opacity = "0";
+    pane.style.zIndex = 401;
+    const layer = L.geoJSON(cache[file], { style: styleFor, onEachFeature, pane: paneName }).addTo(map);
+    requestAnimationFrame(() => { pane.style.opacity = "1"; });
+
+    const oldLayer = currentLayer, oldPane = currentPane;
+    if (oldPane) oldPane.style.zIndex = 400;
+    if (oldLayer) {
+      if (oldPane) oldPane.style.opacity = "0";
+      setTimeout(() => {
+        map.removeLayer(oldLayer);
+        if (oldPane && oldPane.parentNode) oldPane.parentNode.removeChild(oldPane);
+      }, 650);
+    }
+    currentLayer = layer;
+    currentPane = pane;
+  }
+
+  function showFact(value) {
+    const fact = FACTS[value];
+    factsEl.classList.add("swap");           // fade text out
+    setTimeout(() => {
+      factsEl.querySelector(".era-label").textContent = formatYear(value);
+      if (fact) {
+        factsEl.querySelector("h2").textContent = fact[0];
+        factsEl.querySelector("p").textContent = fact[1];
+      } else {
+        factsEl.querySelector("h2").textContent = "—";
+        factsEl.querySelector("p").textContent = "";
+      }
+      factsEl.classList.remove("swap");      // fade new text in
+    }, 200);
+  }
+
+  function formatYear(v) {
+    return v < 0 ? `${Math.abs(v).toLocaleString()} BC` : `${v} AD`;
+  }
+  function updateLabel(v) {
+    document.querySelector("#yearLabel .num").textContent =
+      v < 0 ? Math.abs(v).toLocaleString() : v;
+    document.querySelector("#yearLabel .era").textContent = v < 0 ? "BC" : "AD";
+  }
+
+  // --- Slider wiring ---
+  const slider = document.getElementById("slider");
+  slider.max = YEARS.length - 1;
+  slider.value = YEARS.findIndex(y => y.value === 1900); // start on a recognizable year
+
+  let debounce = null;
+  slider.addEventListener("input", () => {
+    updateLabel(YEARS[slider.value].value);
+    clearTimeout(debounce);
+    debounce = setTimeout(() => loadYear(parseInt(slider.value, 10)), 120);
+  });
+
+  // Tick marks
+  const ticksEl = document.getElementById("ticks");
+  [-123000, -1, 1000, 1500, 1800, 2010].forEach(v => {
+    const span = document.createElement("span");
+    span.textContent = formatYear(v);
+    ticksEl.appendChild(span);
+  });
+
+  // --- Play / pause animation ---
+  const playBtn = document.getElementById("playBtn");
+  let timer = null;
+  playBtn.addEventListener("click", () => {
+    if (timer) { clearInterval(timer); timer = null; playBtn.textContent = "▶"; return; }
+    playBtn.textContent = "⏸";
+    timer = setInterval(() => {
+      let i = parseInt(slider.value, 10) + 1;
+      if (i > YEARS.length - 1) { clearInterval(timer); timer = null; playBtn.textContent = "▶"; return; }
+      slider.value = i;
+      loadYear(i);
+    }, 1400);
+  });
+
+  // Initial load
+  loadYear(parseInt(slider.value, 10));
+  </script>
+</body>
+</html>
