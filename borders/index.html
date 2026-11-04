@@ -212,7 +212,6 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script>
 const SNAPS = [
   [-123000, "The last interglacial: Neanderthals, Denisovans and early modern humans"],
@@ -501,6 +500,7 @@ function drawRelief() {
   if (!relief || !terrainEl.checked) return;
   const s = projection.scale() / relief.k, [tx, ty] = projection.translate();
   ctx.save();
+  if (land) { ctx.beginPath(); path(land); ctx.clip(); } // the shading stops at the map's own coastline
   ctx.globalCompositeOperation = "hard-light";
   ctx.globalAlpha = colors.relief;
   ctx.drawImage(reliefCanvas, tx - s * relief.tx, ty - s * relief.ty, relief.W * s, relief.H * s);
@@ -1078,13 +1078,10 @@ window.addEventListener("resize", resize);
 
 // Boot
 resize();
-// The 110m land layer leaves out several large Baltic islands, so add the outlines the border data uses
-Promise.all([fetch("data/land-110m.json").then(r => r.json()), fetch("data/islands.json").then(r => r.json()).catch(() => [])])
-  .then(([t, islands]) => {
-    land = topojson.feature(t, t.objects.land);
-    land.features.push({ type: "Feature", geometry: { type: "MultiPolygon", coordinates: fixWinding(islands) } });
-    draw();
-  }).catch(() => {});
+// The land is drawn on the same coastline as the borders, so territories, unclaimed land and terrain all line up
+fetch("data/land.json").then(r => r.json())
+  .then(polys => { land = { type: "MultiPolygon", coordinates: fixWinding(polys) }; draw(); })
+  .catch(() => {});
 Promise.all([fetch("data/facts.json").then(r => r.json()), fetch("data/index.json").then(r => r.json())])
   .then(([f, ix]) => { FACTS = f; INDEX = ix; if (pinned) showInfo(pinned); })
   .catch(() => { FACTS = {}; INDEX = {}; });
