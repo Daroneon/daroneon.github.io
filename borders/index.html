@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="An interactive world map of historical borders from 123,000 BC to 2010, with capitals, rulers and facts.">
+<title>Borders Through Time</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,500;0,700;1,500&family=Alegreya+Sans+SC:wght@500;700&family=Alegreya+Sans:wght@400;500&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: a full-bleed atlas sheet with shaded relief, a docked "time rule" along the bottom edge, and a gazetteer card for the selected territory. */
+:root {
+  --ocean: #cfdce3;
+  --unclaimed: #e6e3da;
+  --border: rgba(40, 52, 60, .55);
+  --ink: #1f2a31;
+  --ink-soft: #55646d;
+  --panel: rgba(246, 248, 248, .95);
+  --panel-line: #c3cfd5;
+  --note-bg: rgba(178, 67, 47, .08);
+  --accent: #b2432f;
+  --grat: rgba(40, 70, 90, .12);
+  --halo: rgba(255, 255, 255, .8);
+  --relief: .62;
+  --c0:#e8c98f; --c1:#b9d3a6; --c2:#e3a99a; --c3:#a9c4dc; --c4:#d8b8d6;
+  --c5:#f0dc9c; --c6:#9fcfc4; --c7:#d9b48f; --c8:#c6c9e8; --c9:#e5b7b0;
+  --f-display: "Alegreya", Georgia, "Times New Roman", serif;
+  --f-label: "Alegreya Sans SC", "Gill Sans", "Trebuchet MS", sans-serif;
+  --f-body: "Alegreya Sans", "Gill Sans", "Trebuchet MS", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ocean: #0f1a22; --unclaimed: #2a3133; --border: rgba(10, 14, 16, .9);
+  --ink: #e7ecee; --ink-soft: #9aa9b1; --panel: rgba(18, 27, 33, .94); --panel-line: #2e3e48;
+  --note-bg: rgba(238, 138, 111, .1);
+  --accent: #ee8a6f; --grat: rgba(160, 200, 220, .08); --halo: rgba(10, 18, 24, .85); --relief: .55;
+  --c0:#8a6f3e; --c1:#56704a; --c2:#8a4f45; --c3:#405f7c; --c4:#6e5170;
+  --c5:#7f7240; --c6:#3f6f66; --c7:#7a5a3d; --c8:#53577f; --c9:#7f4f4a;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --ocean: #0f1a22; --unclaimed: #2a3133; --border: rgba(10, 14, 16, .9);
+  --ink: #e7ecee; --ink-soft: #9aa9b1; --panel: rgba(18, 27, 33, .94); --panel-line: #2e3e48;
+  --note-bg: rgba(238, 138, 111, .1);
+  --accent: #ee8a6f; --grat: rgba(160, 200, 220, .08); --halo: rgba(10, 18, 24, .85); --relief: .55;
+  --c0:#8a6f3e; --c1:#56704a; --c2:#8a4f45; --c3:#405f7c; --c4:#6e5170;
+  --c5:#7f7240; --c6:#3f6f66; --c7:#7a5a3d; --c8:#53577f; --c9:#7f4f4a;
+  color-scheme: dark }
+
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--ocean); color: var(--ink); font-family: var(--f-body); overflow: hidden; }
+#app { position: relative; height: 100%; }
+#map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+#map:active { cursor: grabbing; }
+
+.title {
+  position: absolute; top: 14px; left: max(16px, env(safe-area-inset-left, 0px));
+  pointer-events: none; display: grid; gap: 2px;
+}
+.title h1 { margin: 0; font: 700 1.35rem/1.1 var(--f-display); letter-spacing: .01em; text-wrap: balance; }
+.title p { margin: 0; font: 500 .72rem/1.3 var(--f-label); letter-spacing: .08em; color: var(--ink-soft); }
+
+.zoom {
+  position: absolute; top: 14px; right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 6px;
+}
+button {
+  font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--panel-line);
+  border-radius: 6px; cursor: pointer; display: grid; place-items: center;
+}
+button:hover { border-color: var(--ink-soft); }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.zoom button { width: 34px; height: 34px; font-size: 1.1rem; }
+
+#info {
+  position: absolute; right: calc(max(16px, env(safe-area-inset-right, 0px)) + 44px); top: 14px;
+  width: min(330px, calc(100% - 92px)); max-height: calc(100% - 190px); overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--panel-line);
+  border-radius: 8px; padding: 14px 16px 14px; display: grid; gap: 9px; box-shadow: 0 6px 24px rgba(0,0,0,.14);
+}
+#info h2 { margin: 0; font: 700 1.25rem/1.15 var(--f-display); padding-right: 22px; text-wrap: balance; }
+#info .ruler { font: 500 .74rem/1.3 var(--f-label); letter-spacing: .07em; color: var(--ink-soft); display: flex; align-items: center; gap: 7px; }
+#info .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; border: 1px solid var(--border); flex: none; }
+#info .fact { margin: 0; font: 500 1rem/1.45 var(--f-display); }
+#info .note { margin: 0; font-size: .86rem; line-height: 1.45; background: var(--note-bg); border-radius: 6px; padding: 8px 10px; }
+#info .note b { display: block; font: 700 .66rem/1.2 var(--f-label); letter-spacing: .12em; color: var(--accent); margin-bottom: 3px; }
+#info dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: .84rem; border-top: 1px solid var(--panel-line); padding-top: 9px; }
+#info dt { color: var(--ink-soft); font-family: var(--f-label); letter-spacing: .06em; font-size: .7rem; padding-top: 2px; }
+#info dd { margin: 0; min-width: 0; font-variant-numeric: tabular-nums; }
+#info a { color: var(--accent); font-size: .84rem; justify-self: start; }
+#info .close { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border: 0; background: transparent; font-size: 1.05rem; color: var(--ink-soft); }
+
+#tip {
+  position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--panel-line);
+  border-radius: 5px; padding: 5px 8px; font-size: .82rem; white-space: nowrap; transform: translate(12px, 12px);
+}
+#tip b { font-family: var(--f-display); font-weight: 700; }
+#tip span { color: var(--ink-soft); }
+#tip em { display: block; font-style: normal; font-size: .72rem; color: var(--ink-soft); }
+
+.rule {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel); border-top: 1px solid var(--panel-line);
+  display: grid; grid-template-columns: auto 1fr; gap: 10px 32px; align-items: center;
+}
+.readout { display: grid; gap: 2px; min-width: 11.5ch; }
+.readout .year { font: 700 2rem/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.readout .era { font: 500 .66rem/1 var(--f-label); letter-spacing: .14em; color: var(--accent); }
+.track { display: grid; gap: 14px; min-width: 0; }
+.topline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; }
+.caption { font-size: .95rem; color: var(--ink); min-height: 1.2em; }
+.caption .count { color: var(--ink-soft); font-size: .82rem; margin-left: 8px; }
+.options { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: .82rem; color: var(--ink-soft); }
+.switch { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch .knob { position: relative; width: 28px; height: 16px; border-radius: 8px; background: var(--panel-line); transition: background .2s; flex: none; }
+.switch .knob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--panel); transition: transform .2s; }
+.switch input:checked + .knob { background: var(--accent); }
+.switch input:checked + .knob::after { transform: translateX(12px); }
+.switch input:focus-visible + .knob { outline: 2px solid var(--accent); outline-offset: 2px; }
+#speed { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--panel-line); border-radius: 5px; padding: 2px 4px; }
+@media (prefers-reduced-motion: reduce) { .switch .knob, .switch .knob::after { transition: none; } }
+.controls { display: flex; align-items: center; gap: 28px; }
+.steps { display: flex; gap: 8px; flex: none; }
+.steps button { width: 38px; height: 34px; }
+.steps button svg { width: 14px; height: 14px; fill: currentColor; }
+.slider-wrap { position: relative; flex: 1; min-width: 0; padding-bottom: 22px; }
+#year { width: 100%; margin: 0; accent-color: var(--accent); height: 22px; }
+.ticks { position: absolute; left: 8px; right: 8px; bottom: 0; height: 18px; font: 500 .66rem/1 var(--f-mono); color: var(--ink-soft); }
+.ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; top: 6px; }
+.ticks span.first { transform: translateX(-8px); } /* the end labels stay inside the timescale */
+.ticks span.last { transform: translateX(calc(-100% + 8px)); }
+.ticks i { position: absolute; top: -4px; width: 1px; height: 4px; background: var(--ink-soft); opacity: .5; }
+.credit { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(100% + 6px); font-size: .7rem; color: var(--ink-soft); pointer-events: auto; }
+.credit a { color: inherit; }
+#loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font: 500 .8rem var(--f-label); letter-spacing: .1em; color: var(--ink-soft); background: var(--panel); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--panel-line); }
+
+@media (max-width: 640px) {
+  .title h1 { font-size: 1.1rem; }
+  .title p { display: none; }
+  .rule { grid-template-columns: 1fr; gap: 10px; padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .track { gap: 12px; }
+  .controls { gap: 18px; }
+  .readout { grid-auto-flow: column; justify-content: start; align-items: baseline; gap: 10px; }
+  .readout .year { font-size: 1.5rem; }
+  .ticks span.minor { display: none; }
+  #info { top: auto; bottom: calc(var(--rule-h, 190px) + 10px);left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: auto; max-height: 46%; }
+  .credit { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <canvas id="map" aria-label="World map of historical borders"></canvas>
+  <div class="title">
+    <h1>Borders Through Time</h1>
+    <p>Drag the time rule · tap a territory for its story</p>
+  </div>
+  <div class="zoom">
+    <button id="zin" aria-label="Zoom in">+</button>
+    <button id="zout" aria-label="Zoom out">−</button>
+    <button id="zreset" aria-label="Reset view" style="font-size:.8rem">⟲</button>
+  </div>
+  <div id="tip" hidden></div>
+  <aside id="info" hidden aria-live="polite">
+    <button class="close" id="infoClose" aria-label="Close">×</button>
+    <h2 id="infoName"></h2>
+    <div class="ruler" id="infoRuler"></div>
+    <p class="fact" id="infoFact"></p>
+    <p class="note" id="infoNote" hidden></p>
+    <dl id="infoStats"></dl>
+    <a id="infoLink" href="#" target="_blank" rel="noopener">Read more on Wikipedia</a>
+  </aside>
+  <div id="loading">Loading map…</div>
+
+  <div class="rule">
+    <div class="credit">Borders: <a href="https://github.com/aourednik/historical-basemaps" target="_blank" rel="noopener">historical-basemaps</a> by A. Ourednik, with about 400 corrections · Relief: <a href="https://www.naturalearthdata.com" target="_blank" rel="noopener">Natural Earth</a> · Borders are approximate.</div>
+    <div class="readout">
+      <div class="year" id="yearLabel">1914</div>
+      <div class="era" id="eraLabel">Modern</div>
+    </div>
+    <div class="track">
+      <div class="topline">
+        <div class="caption"><span id="caption"></span><span class="count" id="count"></span></div>
+        <div class="options">
+          <label class="switch"><input type="checkbox" id="terrain" checked><span class="knob" aria-hidden="true"></span>Terrain</label>
+          <label class="switch"><input type="checkbox" id="capitals" checked><span class="knob" aria-hidden="true"></span>Capitals</label>
+          <label class="switch"><input type="checkbox" id="smooth" checked><span class="knob" aria-hidden="true"></span>Smooth changes</label>
+          <label class="switch"><input type="checkbox" id="autoplay"><span class="knob" aria-hidden="true"></span>Auto-play</label>
+          <select id="speed" aria-label="Auto-play speed">
+            <option value="3200">Slow</option>
+            <option value="1900" selected>Normal</option>
+            <option value="1100">Fast</option>
+          </select>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="steps">
+          <button id="prev" aria-label="Previous snapshot"><svg viewBox="0 0 16 16"><path d="M11 2 4 8l7 6z"/></svg></button>
+          <button id="next" aria-label="Next snapshot"><svg viewBox="0 0 16 16"><path d="M5 2l7 6-7 6z"/></svg></button>
+        </div>
+        <div class="slider-wrap">
+          <input type="range" id="year" min="0" max="0" step="1" aria-label="Year">
+          <div class="ticks" id="ticks"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+const SNAPS = [
+  [-123000, "The last interglacial: Neanderthals, Denisovans and early modern humans"],
+  [-10000, "The last Ice Age ends"],
+  [-8000, "Early farming villages in the Fertile Crescent"],
+  [-5000, "Farming spreads across Eurasia"],
+  [-4000, "The Uruk period: the first cities in Mesopotamia"],
+  [-3000, "Egypt is unified; Sumerian city-states"],
+  [-2000, "Middle Kingdom Egypt and the Indus cities"],
+  [-1500, "New Kingdom Egypt, the Hittites and Shang China"],
+  [-1000, "The early Iron Age; Zhou rule in China"],
+  [-700, "The Neo-Assyrian Empire at its height"],
+  [-500, "Achaemenid Persia at its height"],
+  [-400, "Classical Greece, Warring States China"],
+  [-323, "Alexander the Great dies in Babylon"],
+  [-300, "Alexander's successors divide his empire"],
+  [-200, "Rome defeats Carthage; the Han dynasty rises"],
+  [-100, "The late Roman Republic"],
+  [-1, "Augustus rules Rome, the Han rule China"],
+  [100, "Rome nears its greatest extent (reached in 117)"],
+  [200, "Rome, Parthia and the late Han"],
+  [300, "Diocletian's tetrarchy shares out Roman rule"],
+  [400, "The Roman Empire splits for good (395)"],
+  [500, "Successor kingdoms in the old western empire"],
+  [600, "Byzantium and Sasanian Persia"],
+  [700, "The Umayyad Caliphate expands"],
+  [800, "Charlemagne, the Abbasids and Tang China"],
+  [900, "The Abbasid Caliphate fragments"],
+  [1000, "Song China, the Fatimids, the Holy Roman Empire"],
+  [1100, "Just after the First Crusade (1096–1099)"],
+  [1200, "On the eve of the Mongol conquests"],
+  [1279, "Yuan China completes the conquest of the Song"],
+  [1300, "The Mongol successor khanates"],
+  [1400, "Ming China and Timur's empire"],
+  [1492, "Columbus reaches the Caribbean; Granada falls"],
+  [1500, "The age of exploration"],
+  [1530, "Spain has conquered the Aztecs; the Inca still rule"],
+  [1600, "Ottoman, Safavid and Mughal empires"],
+  [1650, "After the Thirty Years' War (1648)"],
+  [1700, "European colonial empires grow"],
+  [1715, "End of the War of the Spanish Succession"],
+  [1783, "The United States wins independence"],
+  [1800, "Napoleon rules France"],
+  [1815, "Europe redrawn at the Congress of Vienna"],
+  [1878, "The Congress of Berlin"],
+  [1880, "Before the Scramble for Africa"],
+  [1900, "Most of Africa is under colonial rule"],
+  [1914, "On the eve of World War I"],
+  [1920, "Europe redrawn after World War I"],
+  [1930, "The interwar years"],
+  [1938, "Germany has annexed Austria and the Sudetenland"],
+  [1945, "World War II ends; Germany is occupied"],
+  [1960, "Seventeen African countries gain independence"],
+  [1994, "After the Soviet Union breaks up"],
+  [2000, "The turn of the millennium"],
+  [2010, "The world in 2010"],
+];
+const TICK_YEARS = new Set([-123000, -2000, -1, 500, 1000, 1500, 1800, 1914, 2010]);
+const EARTH_R2 = 6371 * 6371;
+const fmtYear = y => y < 0 ? `${(-y).toLocaleString("en-US")} BC` : (y < 1000 ? `AD ${y}` : String(y));
+const fileKey = y => y < 0 ? `bc${-y}` : String(y);
+const era = y => y < -3000 ? "Prehistory" : y < 500 ? "Antiquity" : y < 1500 ? "Middle Ages" : y < 1800 ? "Early modern" : "Modern";
+const normKey = s => (s || "").normalize("NFC").trim();
+function fmtArea(km2) {
+  if (km2 >= 1e6) return `${(km2 / 1e6).toFixed(km2 >= 1e7 ? 1 : 2)} million km²`;
+  const mag = Math.pow(10, Math.max(0, Math.floor(Math.log10(Math.max(km2, 1))) - 1));
+  return `about ${(Math.round(km2 / mag) * mag).toLocaleString("en-US")} km²`;
+}
+
+// Name variants and successor states share one colour so that territories keep their colour across years.
+const COLOR_ALIAS = {};
+[["Britain", "United Kingdom of Great Britain and Ireland", "United Kingdom", "UK", "Kingdom of Great Britain", "England", "Great Britain", "England and Ireland"],
+ ["Spain", "Spanish Habsburg", "Castile"],
+ ["US", "USA", "United States", "United States of America"],
+ ["Russia", "Russian Empire", "Tsardom of Muscovy", "Grand Duchy of Moscow", "USSR", "Soviet Russia (RSFSR)"],
+ ["China", "Qing Empire", "Ming Empire", "Yuan dynasty", "Song Empire", "Tang Empire", "Sui Empire", "Han Empire", "Republic of China", "Jin"],
+ ["France", "Kingdom of France"],
+ ["Austria", "Habsburg Monarchy", "Austrian Empire", "Austria-Hungary"],
+ ["Germany", "German Empire", "Prussia"],
+ ["Ottoman", "Ottoman Empire", "Ottoman Sultanate", "Turkey"],
+ ["Persia", "Iran", "Sasanian Empire", "Parthian Empire", "Achaemenid Empire", "Safavid Empire"],
+ ["Netherlands", "United Kingdom of Netherlands", "Dutch Republic", "Batavian Republic"],
+ ["Byzantium", "Eastern Roman Empire", "Byzantine Empire"],
+ ["Rome", "Roman Republic", "Roman Empire", "Western Roman Empire", "Rome (Diocletian)", "Rome (Maximian)", "Rome (Galerius)", "Rome (Constantius)"],
+ ["Japan", "Empire of Japan", "Imperial Japan", "Tokugawa shogunate", "Ashikaga shogunate", "Shogun Japan (Kamakura)", "Japan (Warring States)", "Imperial Japan (Fujiwara)"],
+ ["Italy", "Kingdom of Italy"],
+ ["Siam", "Thailand", "Rattanakosin Kingdom", "Ayutthaya"],
+ ["Ethiopia", "Abyssinia"],
+ ["Brazil", "Empire of Brazil"],
+ ["Korea", "Joseon", "Goryeo"],
+ ["Vietnam", "Đại Việt", "Annam"],
+ ["Denmark", "Denmark-Norway"],
+ ["Sweden", "Sweden–Norway"],
+ ["Poland", "Poland-Lithuania", "Polish–Lithuanian Commonwealth"],
+].forEach(([key, ...names]) => names.forEach(n => { COLOR_ALIAS[n] = key; }));
+
+const canvas = document.getElementById("map");
+const ctx = canvas.getContext("2d");
+const slider = document.getElementById("year");
+const smoothEl = document.getElementById("smooth");
+const terrainEl = document.getElementById("terrain");
+smoothEl.checked = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+try { const s = localStorage.getItem("btt-smooth"); if (s !== null) smoothEl.checked = s === "1"; } catch (e) {}
+try { const s = localStorage.getItem("btt-terrain"); if (s !== null) terrainEl.checked = s === "1"; } catch (e) {}
+const capsEl = document.getElementById("capitals");
+try { const s = localStorage.getItem("btt-capitals"); if (s !== null) capsEl.checked = s === "1"; } catch (e) {}
+const tip = document.getElementById("tip");
+const info = document.getElementById("info");
+const cache = new Map();
+let land = null, feats = [], current = -1, W = 0, H = 0, dpr = 1;
+let hoverKey = null, pinned = null, transform = d3.zoomIdentity, colors = {};
+let FACTS = null, INDEX = null, RULERS = null;
+
+const projection = d3.geoNaturalEarth1();
+const path = d3.geoPath(projection, ctx);
+const measure = d3.geoPath(projection);
+const sphere = { type: "Sphere" };
+const graticule = d3.geoGraticule10();
+let base = { k: 1, tx: 0, ty: 0 };
+
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  colors = { ocean: g("--ocean"), unclaimed: g("--unclaimed"), border: g("--border"), ink: g("--ink"),
+    halo: g("--halo"), grat: g("--grat"), accent: g("--accent"), relief: parseFloat(g("--relief")) || .85,
+    pal: Array.from({ length: 10 }, (_, i) => g(`--c${i}`)) };
+}
+function hash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+const ownerOf = f => f.sov || f.name || "";
+const ownerKey = f => { const o = ownerOf(f); return COLOR_ALIAS[o] || o; };
+const colorOf = f => ownerKey(f) ? colors.pal[hash(ownerKey(f)) % 10] : colors.unclaimed;
+
+// Rings in the source use the GeoJSON winding; d3 wants the opposite, so flip any polygon that covers more than a hemisphere.
+function fixWinding(coords) {
+  return coords.map(poly => {
+    if (d3.geoArea({ type: "Polygon", coordinates: poly }) > 2 * Math.PI) poly = poly.map(r => r.slice().reverse());
+    return poly;
+  });
+}
+function prepare(raw) {
+  return raw.features.map(f => {
+    const coords = fixWinding(f.g);
+    const geom = { type: "MultiPolygon", coordinates: coords };
+    const polys = coords.map(c => ({ type: "Polygon", coordinates: c }));
+    let big = 0, bigA = -1;
+    polys.forEach((p, i) => { const a = d3.geoArea(p); if (a > bigA) { bigA = a; big = i; } });
+    const name = normKey(f.p[0]);
+    return { name, sov: normKey(f.p[1]), partOf: normKey(f.p[2]), srcLabel: f.p[3] || null, note: f.p[4] || null,
+      geom, polys, big, area: d3.geoArea(geom), bounds: d3.geoBounds(geom) };
+  }).sort((a, b) => b.area - a.area);
+}
+async function load(i) {
+  const y = SNAPS[i][0];
+  if (!cache.has(y)) cache.set(y, fetch(`data/world_${fileKey(y)}.json`).then(r => r.json()).then(prepare)
+    .then(list => { list.year = y; return list; }));
+  return cache.get(y);
+}
+
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  const ruleH = document.querySelector(".rule").offsetHeight;
+  document.documentElement.style.setProperty("--rule-h", ruleH + "px"); // the phone card sits just above the panel
+  projection.scale(1).translate([0, 0]).fitExtent([[10, 50], [W - 10, H - ruleH - 10]], sphere);
+  base = { k: projection.scale(), tx: projection.translate()[0], ty: projection.translate()[1] };
+  applyTransform();
+}
+function applyTransform() {
+  projection.scale(base.k * transform.k).translate([base.tx * transform.k + transform.x, base.ty * transform.k + transform.y]);
+  move = null; // the fronts were worked out for the old view; finish any change with a plain fade
+  draw();
+  requestRelief();
+}
+
+// ---------- Shaded relief ----------
+// Natural Earth's shaded relief is reprojected in a worker for the current view. While the view moves,
+// the last rendering is stretched to fit, then replaced once the view settles.
+const RELIEF_WORKER = `
+let L = null, mode = 128, gain = 1.6;
+self.onmessage = e => {
+  const m = e.data;
+  if (m.type === "init") { L = m.levels; mode = m.mode; gain = m.gain; return; }
+  if (!L) return;
+  const { id, W, H, k, tx, ty } = m;
+  const out = new Uint8ClampedArray(W * H * 4);
+  const pxPerRad = k * 0.8707;
+  let lv = L[0];
+  for (let i = L.length - 1; i >= 0; i--) { if ((L[i].w / (2 * Math.PI)) / pxPerRad >= 0.75) { lv = L[i]; break; } }
+  const sw = lv.w, sh = lv.h, src = lv.data, PI = Math.PI;
+  for (let y = 0; y < H; y++) {
+    const ry = (ty - (y + 0.5)) / k;
+    if (ry > 1.4224 || ry < -1.4224) continue;
+    let phi = ry;
+    for (let i = 0; i < 25; i++) {
+      const p2 = phi * phi, p4 = p2 * p2;
+      const d = (phi * (1.007226 + p2 * (0.015085 + p4 * (-0.044475 + 0.028874 * p2 - 0.005916 * p4))) - ry) /
+        (1.007226 + p2 * (0.015085 * 3 + p4 * (-0.044475 * 7 + 0.028874 * 9 * p2 - 0.005916 * 11 * p4)));
+      phi -= d;
+      if (d < 1e-9 && d > -1e-9) break;
+    }
+    const q2 = phi * phi;
+    const fx = 0.8707 + q2 * (-0.131979 + q2 * (-0.013791 + q2 * q2 * q2 * (0.003971 - 0.001529 * q2)));
+    const v = (PI / 2 - phi) / PI * sh - 0.5;
+    const v0 = Math.floor(v), fv = v - v0;
+    const r0 = Math.max(0, Math.min(sh - 1, v0)) * sw, r1 = Math.max(0, Math.min(sh - 1, v0 + 1)) * sw;
+    let o = y * W * 4;
+    for (let x = 0; x < W; x++, o += 4) {
+      const lam = ((x + 0.5) - tx) / k / fx;
+      if (lam < -PI || lam > PI) continue;
+      const u = (lam + PI) / (2 * PI) * sw - 0.5;
+      let u0 = Math.floor(u); const fu = u - u0; let u1 = u0 + 1;
+      if (u0 < 0) u0 += sw; if (u1 >= sw) u1 -= sw;
+      const a = src[r0 + u0], b = src[r0 + u1], c = src[r1 + u0], d = src[r1 + u1];
+      const top = a + (b - a) * fu, bot = c + (d - c) * fu;
+      const val = 128 + ((top + (bot - top) * fv) - mode) * gain;
+      out[o] = out[o + 1] = out[o + 2] = val; out[o + 3] = 255;
+    }
+  }
+  self.postMessage({ id, W, H, buf: out.buffer }, [out.buffer]);
+};`;
+const RELIEF_GAIN = 2.2;
+let reliefWorker = null, relief = null, reliefReady = false, reliefTimer = 0, reliefId = 0, reliefPending = null;
+const reliefCanvas = document.createElement("canvas");
+
+function halve(src, w, h) {
+  const w2 = w >> 1, h2 = h >> 1, out = new Uint8Array(w2 * h2);
+  for (let y = 0; y < h2; y++) for (let x = 0; x < w2; x++) {
+    const i = (y * 2) * w + x * 2;
+    out[y * w2 + x] = (src[i] + src[i + 1] + src[i + w] + src[i + w + 1] + 2) >> 2;
+  }
+  return out;
+}
+async function initRelief() {
+  try {
+    const img = new Image();
+    img.src = "data/relief.jpg";
+    await img.decode();
+    const small = Math.max(window.innerWidth, window.innerHeight) < 900;
+    const sw = small ? 2048 : img.naturalWidth, sh = sw / 2;
+    const c = document.createElement("canvas"); c.width = sw; c.height = sh;
+    const cx = c.getContext("2d", { willReadFrequently: true });
+    cx.drawImage(img, 0, 0, sw, sh);
+    const rgba = cx.getImageData(0, 0, sw, sh).data;
+    const gray = new Uint8Array(sw * sh), hist = new Uint32Array(256);
+    for (let i = 0, j = 0; i < gray.length; i++, j += 4) { gray[i] = rgba[j]; hist[rgba[j]]++; }
+    let mode = 0; for (let i = 1; i < 256; i++) if (hist[i] > hist[mode]) mode = i;
+    const levels = [{ w: sw, h: sh, data: gray }];
+    while (levels[levels.length - 1].w > 1024) {
+      const p = levels[levels.length - 1];
+      levels.push({ w: p.w >> 1, h: p.h >> 1, data: halve(p.data, p.w, p.h) });
+    }
+    const onResult = m => {
+      if (m.id !== reliefId) return;
+      reliefCanvas.width = m.W; reliefCanvas.height = m.H;
+      reliefCanvas.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(m.buf), m.W, m.H), 0, 0);
+      relief = reliefPending; draw();
+    };
+    try {
+      reliefWorker = new Worker(URL.createObjectURL(new Blob([RELIEF_WORKER], { type: "text/javascript" })));
+      reliefWorker.onmessage = e => onResult(e.data);
+      reliefWorker.postMessage({ type: "init", levels, mode, gain: RELIEF_GAIN }, levels.map(l => l.data.buffer));
+    } catch (e) {
+      // No worker available: run the same code on the main thread.
+      const scope = {};
+      new Function("self", RELIEF_WORKER)(scope);
+      scope.postMessage = m => onResult(m);
+      scope.onmessage({ data: { type: "init", levels, mode, gain: RELIEF_GAIN } });
+      reliefWorker = { postMessage: m => setTimeout(() => scope.onmessage({ data: m }), 0) };
+    }
+    reliefReady = true;
+    requestRelief(0);
+  } catch (e) { terrainEl.disabled = true; }
+}
+function requestRelief(delay = 140) {
+  if (!reliefReady || !terrainEl.checked) return;
+  clearTimeout(reliefTimer);
+  reliefTimer = setTimeout(() => {
+    const rs = Math.min(dpr, 1.5);
+    const [tx, ty] = projection.translate(), k = projection.scale();
+    reliefPending = { k, tx, ty, W, H };
+    reliefWorker.postMessage({ type: "render", id: ++reliefId, W: Math.round(W * rs), H: Math.round(H * rs), k: k * rs, tx: tx * rs, ty: ty * rs });
+  }, delay);
+}
+function drawRelief() {
+  if (!relief || !terrainEl.checked) return;
+  const s = projection.scale() / relief.k, [tx, ty] = projection.translate();
+  ctx.save();
+  ctx.globalCompositeOperation = "hard-light";
+  ctx.globalAlpha = colors.relief;
+  ctx.drawImage(reliefCanvas, tx - s * relief.tx, ty - s * relief.ty, relief.W * s, relief.H * s);
+  ctx.restore();
+}
+
+// ---------- Drawing ----------
+// Transition state: while fade < 1 the previous snapshot is drawn underneath and the new one is revealed over it,
+// along moving fronts (see below) or, if those can't be used, by fading in.
+let prevFeats = null, fade = 1, fadeStart = 0, fadeDur = 1400, rafId = 0;
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+function fillLayer(list, alpha) {
+  if (alpha <= 0) return;
+  ctx.globalAlpha = alpha;
+  for (const f of list) { ctx.beginPath(); path(f.geom); ctx.fillStyle = colorOf(f); ctx.fill(); }
+  ctx.globalAlpha = 1;
+}
+function strokeLayer(list, alpha) {
+  if (alpha <= 0) return;
+  ctx.globalAlpha = alpha;
+  ctx.lineJoin = "round"; ctx.strokeStyle = colors.border; ctx.lineWidth = .6;
+  for (const f of list) { ctx.beginPath(); path(f.geom); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+}
+
+// ---------- Moving borders ----------
+// Land that changes hands between snapshots is handed over along a moving front: a growing state spreads
+// outward from its old border, and a shrinking one pulls back towards the land it keeps. Both maps are
+// rasterised by owner, and each changed pixel gets a time from how far it lies along that front.
+const ownerIds = new Map();
+function ownerId(f) {
+  const k = ownerKey(f);
+  if (!k) return 0;
+  let id = ownerIds.get(k);
+  if (!id) ownerIds.set(k, id = ownerIds.size + 1);
+  return id;
+}
+const moveLayer = document.createElement("canvas"), moveTmp = document.createElement("canvas"), moveMask = document.createElement("canvas");
+let move = null;
+const rastered = [];
+
+// Scanline fill of every territory's projected outline into a grid of owner ids (no antialiasing to blur owners).
+function rasterize(list, w, h, s) {
+  const key = `${w}x${h}:${projection.scale()}:${projection.translate()}`;
+  if (list.ids && list.ids.key === key) return list.ids.data;
+  const ids = new Int32Array(w * h), xs = [];
+  let rings = [], cur = null;
+  const pen = { moveTo(x, y) { cur = [x * s, y * s]; rings.push(cur); }, lineTo(x, y) { cur.push(x * s, y * s); }, closePath() {}, arc() {} };
+  const trace = d3.geoPath(projection, pen);
+  for (const f of list) { // largest first, so smaller territories end up on top, as on screen
+    rings = []; trace(f.geom);
+    const id = ownerId(f), ex = [];
+    let y0 = Infinity, y1 = -Infinity;
+    for (const r of rings) {
+      for (let i = 0, n = r.length; i < n; i += 2) {
+        const j = (i + 2) % n, ay = r[i + 1], by = r[j + 1];
+        if (ay === by) continue;
+        ex.push(r[i], ay, r[j], by);
+        y0 = Math.min(y0, ay, by); y1 = Math.max(y1, ay, by);
+      }
+    }
+    for (let y = Math.max(0, Math.ceil(y0 - .5)), ye = Math.min(h - 1, Math.floor(y1 - .5)); y <= ye; y++) {
+      const sy = y + .5;
+      xs.length = 0;
+      for (let e = 0; e < ex.length; e += 4) {
+        const ay = ex[e + 1], by = ex[e + 3];
+        if ((ay <= sy) !== (by <= sy)) xs.push(ex[e] + (sy - ay) * (ex[e + 2] - ex[e]) / (by - ay));
+      }
+      xs.sort((p, q) => p - q);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        const xa = Math.max(0, Math.ceil(xs[k] - .5)), xb = Math.min(w - 1, Math.floor(xs[k + 1] - .5));
+        if (xb >= xa) ids.fill(id, y * w + xa, y * w + xb + 1); // a negative end would count from the array's end
+      }
+    }
+  }
+  list.ids = { key, data: ids };
+  rastered.push(list); // keep the grids of the last few snapshots only (about 1 MB each)
+  while (rastered.length > 3) rastered.shift().ids = null;
+  return ids;
+}
+
+// Time (0–1) at which each pixel switches to the new map; -1 means unchanged (3, a plain fade, is a fallback).
+// 1. Growth: distance from the new owner's old land, travelling only through what it gained.
+// 2. New states and far-off gains: distance from the territory's capital, or its middle, through its new land.
+// 3. Shrinking: distance back from the old owner's remaining land, so the far edge goes first.
+// 4. Whatever is left: a territory that vanishes shrinks into its middle; land no front reached grows out of its middle.
+function frontTimes(a, b, w, h, seeds) {
+  const n = w * h, t = new Float32Array(n).fill(-1), q = new Int32Array(n);
+  const near = [-1, 1, -w, w, -w - 1, -w + 1, w - 1, w + 1];
+  // Breadth-first spread from the queued pixels through pixels that `into` gives the same owner and `ok` allows.
+  const spread = (dist, into, ok, qt) => {
+    for (let qh = 0; qh < qt; qh++) {
+      const i = q[qh], L = into[i], d = dist[i] + 1, x = i % w;
+      for (const o of near) {
+        const p = i + o;
+        if (p < 0 || p >= n || Math.abs(p % w - x) > 1) continue;
+        if (dist[p] < 0 && into[p] === L && ok(p)) { dist[p] = d; q[qt++] = p; }
+      }
+    }
+  };
+  // Queues the neighbours of land held by `from` that `into` gives the same owner.
+  const fromEdges = (dist, from, into, ok) => {
+    let qt = 0;
+    for (let i = 0; i < n; i++) {
+      const L = from[i];
+      if (!L) continue;
+      const x = i % w;
+      for (const o of near) {
+        const p = i + o;
+        if (p < 0 || p >= n || Math.abs(p % w - x) > 1) continue;
+        if (dist[p] < 0 && into[p] === L && ok(p)) { dist[p] = 1; q[qt++] = p; }
+      }
+    }
+    return qt;
+  };
+  const changed = p => a[p] !== b[p];
+  const grow = new Int32Array(n).fill(-1), born = new Int32Array(n).fill(-1), shrink = new Int32Array(n).fill(-1);
+  spread(grow, b, changed, fromEdges(grow, a, b, changed));
+  const unborn = p => changed(p) && grow[p] < 0;
+  let qt = 0;
+  for (let k = 0; k < seeds.length; k += 2) {
+    const p = seeds[k];
+    if (born[p] < 0 && b[p] === seeds[k + 1] && unborn(p)) { born[p] = 1; q[qt++] = p; }
+  }
+  spread(born, b, unborn, qt);
+  const left = p => unborn(p) && born[p] < 0;
+  spread(shrink, a, left, fromEdges(shrink, b, a, left));
+  const lab = new Int32Array(n), rest = new Int32Array(n).fill(-1);
+  const isRest = p => left(p) && shrink[p] < 0;
+  qt = 0;
+  for (let i = 0; i < n; i++) if (isRest(i)) lab[i] = a[i] || b[i];
+  for (let i = 0; i < n; i++) {
+    if (!lab[i]) continue;
+    const x = i % w;
+    for (const o of near) {
+      const p = i + o;
+      if (p < 0 || p >= n || Math.abs(p % w - x) > 1 || lab[p] !== lab[i]) { rest[i] = 1; q[qt++] = i; break; }
+    }
+  }
+  spread(rest, lab, p => lab[p] > 0, qt);
+  const size = ownerIds.size + 2, maxGrow = new Int32Array(size), maxBorn = new Int32Array(size), maxShrink = new Int32Array(size), maxRest = new Int32Array(size);
+  for (let i = 0; i < n; i++) {
+    if (grow[i] > maxGrow[b[i]]) maxGrow[b[i]] = grow[i];
+    if (born[i] > maxBorn[b[i]]) maxBorn[b[i]] = born[i];
+    if (shrink[i] > maxShrink[a[i]]) maxShrink[a[i]] = shrink[i];
+    if (rest[i] > maxRest[lab[i]]) maxRest[lab[i]] = rest[i];
+  }
+  for (let i = 0; i < n; i++) {
+    if (a[i] === b[i]) continue;
+    t[i] = grow[i] > 0 ? (grow[i] - 1) / maxGrow[b[i]]
+      : born[i] > 0 ? (born[i] - 1) / maxBorn[b[i]]
+      : shrink[i] > 0 ? 1 - shrink[i] / maxShrink[a[i]]
+      : rest[i] > 0 ? (a[i] ? (rest[i] - 1) / maxRest[lab[i]] : 1 - rest[i] / maxRest[lab[i]]) : 3;
+  }
+  return t;
+}
+
+// Where each territory in `to` starts growing if no old border of its owner touches it: its capital, then the
+// middle of its largest piece. Pairs of [pixel, owner id].
+function frontSeeds(to, w, h, s) {
+  const seeds = [], yk = String(to.year), named = new Set();
+  const add = (p, id) => {
+    if (!p || !isFinite(p[0]) || !isFinite(p[1])) return;
+    const x = Math.floor(p[0] * s), y = Math.floor(p[1] * s);
+    if (x >= 0 && y >= 0 && x < w && y < h) seeds.push(y * w + x, id);
+  };
+  for (const f of to) {
+    const id = ownerId(f);
+    if (!id) continue;
+    const e = RULERS && f.name && !named.has(f.name) && RULERS.s[f.name] && RULERS.s[f.name][yk];
+    if (e && e[0] && RULERS.c[e[0]]) { named.add(f.name); add(projection(RULERS.c[e[0]]), id); }
+    add(measure.centroid(f.polys[f.big]), id);
+  }
+  return seeds;
+}
+
+function buildMove(from, to) {
+  const s = Math.min(1, Math.sqrt(260000 / (W * H)));
+  const w = Math.max(1, Math.round(W * s)), h = Math.max(1, Math.round(H * s));
+  const t = frontTimes(rasterize(from, w, h, s), rasterize(to, w, h, s), w, h, frontSeeds(to, w, h, s));
+  if (moveMask.width !== w || moveMask.height !== h) { moveMask.width = w; moveMask.height = h; }
+  for (const c of [moveLayer, moveTmp]) if (c.width !== canvas.width || c.height !== canvas.height) { c.width = canvas.width; c.height = canvas.height; }
+  const lctx = moveLayer.getContext("2d"), lpath = d3.geoPath(projection, lctx);
+  lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.clearRect(0, 0, moveLayer.width, moveLayer.height);
+  lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // The base goes in too, so land that nobody holds any more is uncovered rather than left in the old colour.
+  lctx.fillStyle = colors.ocean; lctx.fillRect(0, 0, W, H);
+  lctx.beginPath(); lpath(graticule); lctx.strokeStyle = colors.grat; lctx.lineWidth = 1; lctx.stroke();
+  if (land) { lctx.beginPath(); lpath(land); lctx.fillStyle = colors.unclaimed; lctx.fill(); }
+  for (const f of to) { lctx.beginPath(); lpath(f.geom); lctx.fillStyle = colorOf(f); lctx.fill(); }
+  const mctx = moveMask.getContext("2d");
+  return { t, mctx, img: mctx.createImageData(w, h) };
+}
+
+// Reveals the new snapshot's fills through a mask whose edge is the moving front; the soft band keeps it smooth.
+function drawMoving(m, u) {
+  const { t, img } = m, px = img.data, soft = .15, k = u * (1 + soft);
+  for (let i = 0, j = 3; i < t.length; i++, j += 4) {
+    const v = t[i];
+    px[j] = v < 0 ? 255 : v > 2 ? 255 * u : (k - v) / soft * 255;
+  }
+  m.mctx.putImageData(img, 0, 0);
+  const c = moveTmp.getContext("2d");
+  c.globalCompositeOperation = "copy"; c.imageSmoothingEnabled = true;
+  c.drawImage(moveMask, 0, 0, moveTmp.width, moveTmp.height);
+  c.globalCompositeOperation = "source-in"; c.drawImage(moveLayer, 0, 0);
+  c.globalCompositeOperation = "source-over";
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(moveTmp, 0, 0); ctx.restore();
+}
+
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = colors.ocean; ctx.fillRect(0, 0, W, H);
+  ctx.beginPath(); path(graticule); ctx.strokeStyle = colors.grat; ctx.lineWidth = 1; ctx.stroke();
+  if (land) { ctx.beginPath(); path(land); ctx.fillStyle = colors.unclaimed; ctx.fill(); }
+  const a = prevFeats ? ease(fade) : 1;
+  if (prevFeats) fillLayer(prevFeats, 1);
+  if (prevFeats && move) drawMoving(move, a); else fillLayer(feats, a);
+  drawRelief();
+  if (prevFeats) strokeLayer(prevFeats, 1 - a);
+  strokeLayer(feats, a);
+  const hk = pinned ? ownerKey(pinned) : hoverKey;
+  if (hk) {
+    ctx.globalAlpha = a; ctx.strokeStyle = colors.accent; ctx.lineWidth = 1.8;
+    for (const f of feats) if (ownerKey(f) === hk) { ctx.beginPath(); path(f.geom); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+  ctx.beginPath(); path(sphere); ctx.strokeStyle = colors.border; ctx.lineWidth = 1; ctx.stroke();
+  const placedPrev = prevFeats ? drawLabels(prevFeats, 1 - a) : null;
+  const placed = drawLabels(feats, a);
+  if (prevFeats) drawCapitals(prevFeats, 1 - a, placedPrev);
+  drawCapitals(feats, a, placed);
+}
+
+function startFade(from) {
+  cancelAnimationFrame(rafId);
+  move = null;
+  if (!smoothEl.checked || !from || !from.length) { prevFeats = null; fade = 1; draw(); return; }
+  prevFeats = from; fade = 0;
+  try { move = buildMove(from, feats); } catch (e) { move = null; }
+  fadeStart = performance.now();
+  const step = now => {
+    fade = Math.min(1, (now - fadeStart) / fadeDur);
+    if (fade >= 1) { prevFeats = null; move = null; }
+    draw();
+    if (fade < 1) rafId = requestAnimationFrame(step);
+  };
+  rafId = requestAnimationFrame(step);
+}
+
+// Counts the year readout from the old year to the new one alongside the map fade.
+let yearRaf = 0, shownYear = null;
+function animateYear(to) {
+  const el = document.getElementById("yearLabel");
+  cancelAnimationFrame(yearRaf);
+  const from = shownYear;
+  if (from === null || !smoothEl.checked) { shownYear = to; el.textContent = fmtYear(to); return; }
+  const t0 = performance.now();
+  const step = now => {
+    const t = Math.min(1, (now - t0) / fadeDur);
+    let y = Math.round(from + (to - from) * ease(t));
+    if (y === 0) y = to > from ? 1 : -1;
+    shownYear = t >= 1 ? to : y;
+    el.textContent = fmtYear(shownYear);
+    if (t < 1) yearRaf = requestAnimationFrame(step);
+  };
+  yearRaf = requestAnimationFrame(step);
+}
+
+// Returns the boxes it filled, so capital names can fit around them.
+function drawLabels(list, alpha) {
+  if (alpha <= 0.02) return [];
+  ctx.globalAlpha = alpha;
+  const placed = [];
+  const overlaps = r => placed.some(p => r.x < p.x + p.w && r.x + r.w > p.x && r.y < p.y + p.h && r.y + r.h > p.y);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+  const fam = getComputedStyle(document.documentElement).getPropertyValue("--f-label").trim() || "sans-serif";
+  const cands = [];
+  for (const f of list) {
+    if (!f.name) continue;
+    const poly = f.polys[f.big];
+    const a = measure.area(poly);
+    if (a < 260) continue;
+    const c = measure.centroid(poly);
+    if (!isFinite(c[0]) || c[0] < -50 || c[0] > W + 50 || c[1] < -20 || c[1] > H + 20) continue;
+    cands.push({ f, a, c });
+  }
+  cands.sort((x, y) => y.a - x.a);
+  for (const { f, a, c } of cands.slice(0, 220)) {
+    const side = Math.sqrt(a);
+    let size = Math.max(9, Math.min(17, side / 6.5));
+    let text = f.name, w;
+    for (;;) {
+      ctx.font = `700 ${size}px ${fam}`;
+      w = ctx.measureText(text).width;
+      if (w < side * 1.7 || size <= 9) break;
+      size -= 1;
+    }
+    if (w > side * 2.4) continue;
+    const r = { x: c[0] - w / 2 - 2, y: c[1] - size / 2 - 1, w: w + 4, h: size + 2 };
+    if (overlaps(r)) continue;
+    placed.push(r);
+    ctx.strokeStyle = colors.halo; ctx.lineWidth = 3; ctx.strokeText(text, c[0], c[1]);
+    ctx.fillStyle = colors.ink; ctx.fillText(text, c[0], c[1]);
+  }
+  ctx.globalAlpha = 1;
+  return placed;
+}
+
+// ---------- Capitals ----------
+// One dot per territory with a known capital in that snapshot; a hollow dot marks the seat of a colony or vassal.
+// City names appear once the view is zoomed in, wherever they fit between the territory labels.
+function capitalsOf(list) {
+  if (!RULERS || !list || list.year === undefined) return [];
+  if (list.caps) return list.caps;
+  const yk = String(list.year), seenName = new Set(), byCity = new Map();
+  for (const f of list) { // largest first, so a shared seat goes to the bigger territory
+    if (!f.name || seenName.has(f.name)) continue;
+    seenName.add(f.name);
+    const e = RULERS.s[f.name] && RULERS.s[f.name][yk];
+    const ll = e && e[0] && RULERS.c[e[0]];
+    if (ll && !byCity.has(e[0])) byCity.set(e[0], { city: e[0], ll, f, dep: (COLOR_ALIAS[f.name] || f.name) !== ownerKey(f), xy: null });
+  }
+  return (list.caps = [...byCity.values()]);
+}
+function drawCapitals(list, alpha, placed) {
+  if (!capsEl.checked || alpha <= 0.02) return;
+  const caps = capitalsOf(list);
+  if (!caps.length) return;
+  const r = Math.min(4, 2.3 + transform.k * .15);
+  ctx.globalAlpha = alpha;
+  for (const c of caps) {
+    const p = projection(c.ll);
+    c.xy = p && p[0] > -8 && p[0] < W + 8 && p[1] > -8 && p[1] < H + 8 ? p : null;
+    if (!c.xy) continue;
+    ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 2 * Math.PI);
+    ctx.fillStyle = c.dep ? colors.halo : colors.ink; ctx.fill();
+    ctx.lineWidth = 1.3; ctx.strokeStyle = c.dep ? colors.ink : colors.halo; ctx.stroke();
+  }
+  if (transform.k >= 2.5) {
+    const fam = getComputedStyle(document.documentElement).getPropertyValue("--f-label").trim() || "sans-serif";
+    const overlaps = q => placed.some(p => q.x < p.x + p.w && q.x + q.w > p.x && q.y < p.y + p.h && q.y + q.h > p.y);
+    ctx.font = `600 10.5px ${fam}`; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    for (const c of caps) {
+      if (!c.xy) continue;
+      const w = ctx.measureText(c.city).width;
+      for (const x of [c.xy[0] + r + 3, c.xy[0] - r - 3 - w]) {
+        const box = { x: x - 1, y: c.xy[1] - 7, w: w + 2, h: 14 };
+        if (overlaps(box)) continue;
+        placed.push(box);
+        ctx.strokeStyle = colors.halo; ctx.lineWidth = 3; ctx.strokeText(c.city, x, c.xy[1]);
+        ctx.fillStyle = colors.ink; ctx.fillText(c.city, x, c.xy[1]);
+        break;
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function capitalAt(x, y) {
+  if (!capsEl.checked) return null;
+  let best = null, bestD = 8;
+  for (const c of capitalsOf(feats)) {
+    if (!c.xy) continue;
+    const d = Math.hypot(c.xy[0] - x, c.xy[1] - y);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+
+function featureAt(x, y) {
+  const ll = projection.invert([x, y]);
+  if (!ll || !isFinite(ll[0])) return null;
+  let best = null;
+  for (const f of feats) {
+    const [[x0, y0], [x1, y1]] = f.bounds;
+    if (ll[1] < y0 || ll[1] > y1) continue;
+    if (x0 <= x1 && (ll[0] < x0 || ll[0] > x1)) continue;
+    if (d3.geoContains(f.geom, ll) && (!best || f.area < best.area)) best = f;
+  }
+  return best;
+}
+
+// ---------- Gazetteer card ----------
+function factFor(name, year) {
+  if (!FACTS) return null;
+  const v = FACTS[normKey(name)];
+  if (!v) return null;
+  if (typeof v === "string") return v;
+  let pick = v[0][1];
+  for (const [from, text] of v) if (from <= year) pick = text;
+  return pick;
+}
+function showInfo(f) {
+  pinned = f;
+  if (!f) { info.hidden = true; draw(); return; }
+  const y = SNAPS[current][0];
+  document.getElementById("infoName").textContent = f.name || "Unnamed territory";
+  const ruler = document.getElementById("infoRuler"); ruler.replaceChildren();
+  const sw = document.createElement("span"); sw.className = "swatch"; sw.style.background = colorOf(f); ruler.append(sw);
+  const bits = [];
+  if (f.sov && f.sov !== f.name) bits.push(`Ruled by ${f.sov}`);
+  if (f.partOf && f.partOf !== f.name && f.partOf !== f.sov && f.partOf !== f.srcLabel) bits.push(`Part of ${f.partOf}`);
+  if (!bits.length) bits.push(f.name ? "Independent" : "No state claimed this area");
+  ruler.append(bits.join(" · "));
+
+  const factEl = document.getElementById("infoFact");
+  const fact = f.name ? factFor(f.name, y) : null;
+  factEl.textContent = fact || (FACTS ? "" : "Loading facts…");
+  factEl.hidden = !factEl.textContent;
+
+  const noteEl = document.getElementById("infoNote"); noteEl.replaceChildren();
+  if (f.note || f.srcLabel) {
+    const h = document.createElement("b");
+    h.textContent = f.srcLabel ? "Corrected for accuracy" : `In ${fmtYear(y)}`;
+    noteEl.append(h);
+    const parts = [];
+    if (f.srcLabel && f.srcLabel !== f.name) parts.push(`The source map labels this “${f.srcLabel}”.`);
+    if (f.note) parts.push(f.note);
+    noteEl.append(parts.join(" "));
+    noteEl.hidden = false;
+  } else noteEl.hidden = true;
+
+  const dl = document.getElementById("infoStats"); dl.replaceChildren();
+  const row = (k, v) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); };
+  if (f.name) {
+    const reign = RULERS && RULERS.s[f.name] && RULERS.s[f.name][String(y)];
+    if (reign && reign[0]) row("Capital", reign[0]);
+    if (reign && reign[1]) row("In power", reign[1]);
+    const same = feats.filter(g => g.name === f.name);
+    const area = same.reduce((s, g) => s + g.area, 0) * EARTH_R2;
+    row("Size here", fmtArea(area));
+    const ix = INDEX && INDEX[normKey(f.name)];
+    if (ix) {
+      const [first, last, count, peakY, peakA] = ix;
+      row("On this map", first === last ? `${fmtYear(first)} only` : `${fmtYear(first)} – ${fmtYear(last)} (${count} snapshots)`);
+      if (count > 1) row("Largest", `${fmtArea(peakA)} in ${fmtYear(peakY)}`);
+    }
+    const kin = feats.filter(g => ownerKey(g) === ownerKey(f)).length;
+    if (kin > 1 && f.sov) row("Same ruler", `${kin} territories`);
+  } else row("Size here", fmtArea(f.area * EARTH_R2));
+  dl.hidden = !dl.children.length;
+
+  const link = document.getElementById("infoLink");
+  if (f.name) { link.href = `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(f.name.replace(/\s*\(.*?\)\s*/g, " ").trim() || f.name)}`; link.hidden = false; }
+  else link.hidden = true;
+  info.hidden = false; info.scrollTop = 0; draw();
+}
+
+let reqId = 0;
+async function setSnapshot(i) {
+  i = Math.max(0, Math.min(SNAPS.length - 1, i));
+  if (i === current) return;
+  current = i; slider.value = i;
+  const [y, cap] = SNAPS[i];
+  animateYear(y);
+  document.getElementById("eraLabel").textContent = era(y).toUpperCase();
+  document.getElementById("caption").textContent = cap;
+  try { localStorage.setItem("btt-year", String(y)); } catch (e) {}
+  const id = ++reqId;
+  const loadingEl = document.getElementById("loading");
+  const t = setTimeout(() => { if (id === reqId) loadingEl.hidden = false; }, 150);
+  try {
+    const data = await load(i);
+    if (id !== reqId) return;
+    // If a fade is mid-way, start the next one from whatever is most visible.
+    const from = prevFeats && fade < .5 ? prevFeats : feats;
+    feats = data;
+    const n = new Set(feats.filter(f => f.name).map(f => ownerKey(f))).size;
+    document.getElementById("count").textContent = `${n} polities shown`;
+    loadingEl.hidden = true;
+    if (pinned) {
+      const same = feats.find(f => f.name && f.name === pinned.name) || null;
+      same ? showInfo(same) : showInfo(null);
+    }
+    startFade(from);
+    load(Math.min(i + 1, SNAPS.length - 1)); load(Math.max(i - 1, 0));
+  } catch (e) {
+    loadingEl.textContent = "This year's map could not load. Try another year.";
+    loadingEl.hidden = false;
+  } finally { clearTimeout(t); }
+}
+
+// Slider ticks
+slider.max = SNAPS.length - 1;
+const ticks = document.getElementById("ticks");
+SNAPS.forEach(([y], i) => {
+  const pct = (i / (SNAPS.length - 1)) * 100;
+  const mark = document.createElement("i"); mark.style.left = pct + "%"; ticks.append(mark);
+  if (TICK_YEARS.has(y)) {
+    const s = document.createElement("span"); s.style.left = pct + "%";
+    s.textContent = y < 0 ? `${(-y >= 10000 ? Math.round(-y / 1000) + "k" : -y)} BC` : (y < 1000 ? `AD ${y}` : y);
+    if (![-123000, -1, 1000, 1800, 2010].includes(y)) s.className = "minor";
+    if (i === 0) s.classList.add("first");
+    if (i === SNAPS.length - 1) s.classList.add("last");
+    ticks.append(s);
+  }
+});
+slider.addEventListener("input", () => setSnapshot(+slider.value));
+document.getElementById("prev").onclick = () => setSnapshot(current - 1);
+document.getElementById("next").onclick = () => setSnapshot(current + 1);
+
+// Auto-play is off unless the viewer switches it on; it stops at 2010 or when the viewer moves the slider.
+const autoEl = document.getElementById("autoplay"), speedEl = document.getElementById("speed");
+let playTimer = null;
+function setFadeDur() { fadeDur = autoEl.checked ? Math.min(1600, +speedEl.value * .65) : 1400; }
+function stopPlay() { clearInterval(playTimer); playTimer = null; autoEl.checked = false; setFadeDur(); }
+function startPlay() {
+  clearInterval(playTimer);
+  if (current >= SNAPS.length - 1) setSnapshot(0);
+  setFadeDur();
+  playTimer = setInterval(() => { if (current >= SNAPS.length - 1) stopPlay(); else setSnapshot(current + 1); }, +speedEl.value);
+}
+autoEl.addEventListener("change", () => autoEl.checked ? startPlay() : stopPlay());
+speedEl.addEventListener("change", () => { if (autoEl.checked) startPlay(); });
+slider.addEventListener("pointerdown", () => { if (playTimer) stopPlay(); });
+smoothEl.addEventListener("change", () => { try { localStorage.setItem("btt-smooth", smoothEl.checked ? "1" : "0"); } catch (e) {} });
+terrainEl.addEventListener("change", () => {
+  try { localStorage.setItem("btt-terrain", terrainEl.checked ? "1" : "0"); } catch (e) {}
+  if (terrainEl.checked) { if (!reliefReady) initRelief(); else requestRelief(0); }
+  draw();
+});
+capsEl.addEventListener("change", () => {
+  try { localStorage.setItem("btt-capitals", capsEl.checked ? "1" : "0"); } catch (e) {}
+  draw();
+});
+window.addEventListener("keydown", e => {
+  if (e.target === slider || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowLeft") setSnapshot(current - 1);
+  if (e.key === "ArrowRight") setSnapshot(current + 1);
+  if (e.key === "Escape" && pinned) showInfo(null);
+});
+
+// Zoom & pan
+const zoom = d3.zoom().scaleExtent([1, 14]).clickDistance(6).on("zoom", e => { transform = e.transform; tip.hidden = true; applyTransform(); });
+const sel = d3.select(canvas).call(zoom).on("dblclick.zoom", null);
+document.getElementById("zin").onclick = () => sel.transition().duration(300).call(zoom.scaleBy, 1.8);
+document.getElementById("zout").onclick = () => sel.transition().duration(300).call(zoom.scaleBy, 1 / 1.8);
+document.getElementById("zreset").onclick = () => sel.transition().duration(400).call(zoom.transform, d3.zoomIdentity);
+
+canvas.addEventListener("pointermove", e => {
+  if (e.buttons) return;
+  const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  const cap = capitalAt(x, y);
+  const f = cap ? cap.f : featureAt(x, y);
+  const k = f ? ownerKey(f) : null;
+  if (f && e.pointerType === "mouse") {
+    tip.replaceChildren();
+    const b = document.createElement("b"); b.textContent = cap ? cap.city : f.name || "Unnamed territory"; tip.append(b);
+    const sub = cap ? ` · capital of ${f.name}` : f.sov && f.sov !== f.name ? ` · ${f.sov}` : "";
+    if (sub) { const s = document.createElement("span"); s.textContent = sub; tip.append(s); }
+    const hint = document.createElement("em"); hint.textContent = "Click for its story"; tip.append(hint);
+    tip.style.left = Math.min(x, W - 220) + "px"; tip.style.top = y + "px"; tip.hidden = false;
+  } else tip.hidden = true;
+  if (k !== hoverKey) { hoverKey = k; if (!pinned) draw(); }
+});
+canvas.addEventListener("pointerleave", () => { tip.hidden = true; if (hoverKey) { hoverKey = null; if (!pinned) draw(); } });
+let down = null;
+canvas.addEventListener("pointerdown", e => { down = [e.clientX, e.clientY]; });
+canvas.addEventListener("click", e => {
+  if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+  const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  const cap = capitalAt(x, y);
+  showInfo(cap ? cap.f : featureAt(x, y));
+});
+document.getElementById("infoClose").onclick = () => showInfo(null);
+
+// Theme
+readColors();
+const reTheme = () => { readColors(); draw(); };
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", reTheme);
+new MutationObserver(reTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+window.addEventListener("resize", resize);
+
+// Boot
+resize();
+// The 110m land layer leaves out several large Baltic islands, so add the outlines the border data uses
+Promise.all([fetch("data/land-110m.json").then(r => r.json()), fetch("data/islands.json").then(r => r.json()).catch(() => [])])
+  .then(([t, islands]) => {
+    land = topojson.feature(t, t.objects.land);
+    land.features.push({ type: "Feature", geometry: { type: "MultiPolygon", coordinates: fixWinding(islands) } });
+    draw();
+  }).catch(() => {});
+Promise.all([fetch("data/facts.json").then(r => r.json()), fetch("data/index.json").then(r => r.json())])
+  .then(([f, ix]) => { FACTS = f; INDEX = ix; if (pinned) showInfo(pinned); })
+  .catch(() => { FACTS = {}; INDEX = {}; });
+fetch("data/rulers.json").then(r => r.json()).then(d => { RULERS = d; draw(); if (pinned) showInfo(pinned); }).catch(() => {});
+if (terrainEl.checked) initRelief();
+let startY = 1914;
+try { const s = +localStorage.getItem("btt-year"); if (SNAPS.some(([y]) => y === s)) startY = s; } catch (e) {}
+setSnapshot(SNAPS.findIndex(([y]) => y === startY));
+document.fonts && document.fonts.ready.then(draw);
+</script>
+</body>
+</html>
